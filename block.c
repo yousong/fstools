@@ -1197,6 +1197,14 @@ static int umount_device(char *path, int type, bool all)
 	return err;
 }
 
+static bool mount_depends_on(struct mount *a, struct mount *b)
+{
+	size_t al = strlen(a->target);
+	size_t bl = strlen(b->target);
+
+	return (al > bl && a->target[bl] == '/' && !memcmp(a->target, b->target, bl));
+}
+
 static int mount_action(char *action, char *device, int type)
 {
 	struct device *the_dev, *dev;
@@ -1220,7 +1228,7 @@ static int mount_action(char *action, char *device, int type)
 			umount_device(path, type, true);
 		} else
 			vlist_for_element_to_last_reverse(&devices, the_dev, dev, node)
-				if (dev->m && dev->m->type == TYPE_MOUNT)
+				if (dev->m && dev->m->type == TYPE_MOUNT && mount_depends_on(dev->m, the_dev->m))
 					umount_device(dev->pr->dev, type, true);
 		return 0;
 	} else if (!strcmp(action, "add")) {
@@ -1228,7 +1236,7 @@ static int mount_action(char *action, char *device, int type)
 			return -1;
 		if (the_dev->m && the_dev->m->type == TYPE_MOUNT) {
 			vlist_for_first_to_element(&devices, the_dev, dev, node) {
-				if (dev->m && dev->m->type == TYPE_MOUNT) {
+				if (dev->m && dev->m->type == TYPE_MOUNT && mount_depends_on(the_dev->m, dev->m)) {
 					int err = mount_device(dev, type);
 					if (err)
 						return err;
